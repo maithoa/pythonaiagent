@@ -14,9 +14,17 @@ def main():
     if not sys.argv or len(sys.argv) < 2:
         print("Please provide a prompt as a command-line argument.")
         sys.exit(1)
+    verbose_flag = False
+    if len(sys.argv) == 3 and sys.argv[2] == "--verbose":
+        verbose_flag = True
 
     prompt = "".join(sys.argv[1:])
     print (f"Using prompt: {prompt}")
+
+    messages = [
+        {"role":"user", "content":prompt}
+      ]
+    
 
     client = genai.Client(api_key=gemini_api_key)
 
@@ -30,9 +38,11 @@ def main():
         return
     
     print(response.text)
-    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
-    print(f"Total tokens: {response.usage_metadata.total_token_count}")
+    if verbose_flag:
+        print(f"User prompt: {prompt}")
+        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+        print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+        print(f"Total tokens: {response.usage_metadata.total_token_count}")
 
 if __name__ == "__main__":
     main()
