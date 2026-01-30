@@ -1,6 +1,8 @@
 from functions.get_files_info import get_files_info
 from functions.get_file_content import get_file_content
 from functions.write_file import write_file
+from functions.run_python_file import run_python_file
+import os
 
 def main():
     working_directory = "calculator"
@@ -22,8 +24,12 @@ def main():
     write_file(working_directory, "subdir/test_output2.txt", "This is another test content in a subdirectory.")
     write_file(working_directory, "test_output.txt", "This content will overwrite the previous content.")
     write_file(working_directory, "subdir/test_output2.txt", "This content will overwrite the previous content in subdirectory.")
-    
 
+    #test run python file
+    run_python_file(os.path.join(working_directory, "test_output.txt"))
+    run_python_file(os.path.join(working_directory, "main.py"))
+
+    
 
 
 if __name__ == "__main__":
