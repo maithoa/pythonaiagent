@@ -1,7 +1,9 @@
-def get_files_info(working_directory, directory="."):
-    import os
-    from datetime import datetime
+from time import sleep
+import google.genai.types as types
+import os
+from datetime import datetime
 
+def get_files_info(working_directory, directory="."):
     files_info = []
     target_directory = os.path.normpath(os.path.join(working_directory, directory))
     print(f"Scanning directory: {target_directory}")
@@ -15,7 +17,7 @@ def get_files_info(working_directory, directory="."):
         print(f"Warning: The target directory {target_directory} is outside the working directory {working_directory}. Skipping scan.")
         return files_info
     
-    if not os.path.isdir(directory):
+    if not os.path.isdir(target_directory):
         print (f"Warning: The directory {directory} is not a directory. Skipping scan.")
         return files_info
 
@@ -29,8 +31,27 @@ def get_files_info(working_directory, directory="."):
                 "file_path": relative_path,
                 "last_modified": last_modified_datetime.strftime("%Y-%m-%d %H:%M:%S")
             })
-
+    sleep (1)
     return files_info
+
+schema_get_files_info = types.FunctionDeclaration(
+    name="get_files_info",
+    description="Lists files in a specified directory within a working directory.",
+    parameters=types.Schema(
+        type="OBJECT",
+        properties={
+            "working_directory": types.Schema(
+                type="STRING",
+                description="The root path where the operation takes place (e.g., './project_alpha')"
+            ),
+            "directory": types.Schema(
+                type="STRING",
+                description="Sub-directory path to list files from, relative to working_directory."
+            ),
+        },
+        required=["working_directory"] # Bắt buộc phải có cái này thì hàm mới chạy được
+    ),
+)
 
 # Example usage:
 if __name__ == "__main__":
@@ -39,3 +60,4 @@ if __name__ == "__main__":
     files_info = get_files_info(working_directory, directory_to_scan)
     for info in files_info:
         print(f"File: {info['file_path']}, Last Modified: {info['last_modified']}")
+

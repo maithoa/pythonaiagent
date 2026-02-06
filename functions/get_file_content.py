@@ -6,7 +6,7 @@ def get_file_content(working_directory, file_path):
     target_file = os.path.normpath(os.path.join(working_directory, file_path))
     print(f"Scanning file: {target_file}")
 
-    # Will be True or False§
+    # Will be True or False
     abs_file_path = os.path.abspath(target_file)
 
     
@@ -35,7 +35,6 @@ def get_file_content(working_directory, file_path):
 # Example usage:
 if __name__ == "__main__":
     working_directory = "calculator"
-    directory_to_scan = "."
-    files_info = get_files_info(working_directory, directory_to_scan)
-    for info in files_info:
-        print(f"File: {info['file_path']}, Last Modified: {info['last_modified']}")
+    file_to_read = "example.txt"
+    content = get_file_content(working_directory, file_to_read)
+    print(content)

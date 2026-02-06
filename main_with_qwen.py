@@ -8,7 +8,7 @@ from call_function import available_functions
 import argparse
 import functions.get_files_info as get_files_info_module
 #Change to use Hugging Face API due to Google Gemini API Key rate limit issues
-#from huggingface_hub import InferenceClient as hfInferenceClient
+from huggingface_hub import InferenceClient as hfInferenceClient
 
 
 def main():
@@ -18,51 +18,28 @@ def main():
     args = parser.parse_args()
 
     load_dotenv(find_dotenv(),override=True)
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    #gemini_api_key = os.getenv("GEMINI_API_KEY")
     hugging_face_api_key = os.getenv("HUGGING_FACE_API_KEY")
 
     #debug using HF API
-    #hf_client = hfInferenceClient(token=hugging_face_api_key)
-
-    #completion = hf_client.chat.completions.create(
-    #    model="Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    #    messages=[
-    #        {
-    #            "role": "user",
-    #            "content": "What is the capital of France?"
-    #        }
-    #    ],
-    #)
+    hf_client = hfInferenceClient(token=hugging_face_api_key)
 
 
-
-     
-
-
-    if not gemini_api_key:
-        print("GEMINI_API_KEY is not set in the environment.")
-        sys.exit(1)
-
-    if not args or len(args.user_prompt) < 1:
-        print("Please provide a prompt as a command-line argument.")
-        sys.exit(1)
-
-    client =genai.Client(api_key = gemini_api_key)
+    
     messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
 
     if args.verbose:
         print (f"Using prompt: {args.user_prompt}\n")
     
-    generate_content(client, messages, args.verbose)
+    generate_content(hf_client, messages, args.verbose)
 
 
 def generate_content(client, messages, verbose_flag):
-    MODEL_ID = "gemini-2.0-flash"
     try: 
-        stacked_messages = messages
+        stacked_messages = list(messages) 
         # 1. Model think and decide which tool to call
         response = client.models.generate_content(
-            model=MODEL_ID,
+            model="Qwen/Qwen3-Coder-30B-A3B-Instruct",
             contents=stacked_messages,
             config= types.GenerateContentConfig(
                 system_instruction=system_prompt, 
@@ -70,19 +47,16 @@ def generate_content(client, messages, verbose_flag):
                 tools=[available_functions]),
         )
 
-        if not response.candidates or not response.candidates[0].content:
-            print("No candidates returned")
-            return
         #stacked with response message
         stacked_messages.append(response.candidates[0].content)
-
+        
+    
         # Check if there's a function call in the response
         tool_parts = []
-        count_run = 0
         for part in response.candidates[0].content.parts:
-            if part.function_call and count_run < 1:
+            if part.function_call:
                 call = part.function_call
-                print(f"Model is asking to use function: {call.name} with arguments {call.args}")
+                print(f"Model yêu cầu gọi hàm: {call.name} với tham số {call.args}")
     
                 # Execute the function call
                 if call.name == "get_files_info":
@@ -90,44 +64,55 @@ def generate_content(client, messages, verbose_flag):
                 else: 
                     function_result = {"error": f"Function {call.name} not implemented."}
                 
-                tool_parts.append(
-                    types.Part.from_function_response(
-                        name=call.name,
-                        response={'result': function_result}
-                    )
-                )
-                count_run += 1
+                # tool_parts.append(
+                #    types.Part.from_function_response(
+                #        name=part.function_call.name,
+                #       response={"result": function_result}
+                #    )
+                # )
                     
         if tool_parts : 
             tool_content = types.Content(role = "tool", parts=tool_parts)
             stacked_messages.append(tool_content)
         
-        #print ("Stacked messages after tool call:", stacked_messages)
+        print (tool_parts)
+        print (tool_content)
+        return
 
         # 5. GỬI KẾT QUẢ NGƯỢC LẠI CHO MODEL (Lần 2)
         response_final = client.models.generate_content(
-            model=MODEL_ID,
-            contents=stacked_messages, # History of messages
+            model="gemini-2.0-flash-001",
+            contents=stacked_messages, # Lịch sử câu hỏi
             config=types.GenerateContentConfig(
                     system_instruction=system_prompt,
-                    tools=[available_functions],
-                    temperature=0.1,
+                    tools=[available_functions]
                 ),
             )
-        if not response_final or not response_final.candidates or not response_final.candidates[0].content:
-            print("No final candidates returned")
-            return
-        
+        response = response_final
         # Cuối cùng, khi không còn function_call nào, Model sẽ trả về text
-        print("\n=====================Final Result================:")
-        print(response_final.text)
-        #print(response_final)
+        print("\n[Kết quả cuối cùng]:")
+        print(response.text)
+
+        if response is None or not response.function_calls:
+            print("No function call response received from the API.")
+            return
+
+        print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
+        for function_call in response.function_calls:
+            print(f"Calling function: {function_call.name}({function_call.args})")
+    
+
+        if response is None or not response.text:
+            print("No response received from the API.")
+            return
+            
+        print("Response:\n" + response.text)
 
         if verbose_flag:
             print(f"User prompt: {messages[0].parts[0].text}")
-            print(f"Prompt tokens: {response_final.usage_metadata.prompt_token_count}")
-            print(f"Response tokens: {response_final.usage_metadata.candidates_token_count}")
-            print(f"Total tokens: {response_final.usage_metadata.total_token_count}")
+            print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+            print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+            print(f"Total tokens: {response.usage_metadata.total_token_count}")
     
     except Exception as e:
         print(f"[!] Error occurred: {e}")
