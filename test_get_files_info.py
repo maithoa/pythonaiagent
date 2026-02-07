@@ -13,11 +13,13 @@ def main():
 
 
     # Example of getting file content
-    print(get_file_content(working_directory, "lorem.txt"))
-    print(get_file_content(working_directory, "main.py"))
-    print(get_file_content(working_directory, "pkg/calculator.py"))
-    print(get_file_content(working_directory, "pkg/notexists.py"))
-    print(get_file_content(working_directory, "/bin/cat/"))
+    #print(get_file_content("lorem.txt", working_directory))
+    #print(get_file_content("main.py", working_directory))
+    #print(get_file_content("pkg/calculator.py", working_directory))
+    #print(get_file_content("pkg/notexists.py", working_directory))
+    #print(get_file_content("/bin/cat/", working_directory))
+    print(get_file_content("prompts.py", "."))
+
 
     #test write file content 
     write_file(working_directory, "test_output.txt", "This is a test content.")

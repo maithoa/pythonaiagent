@@ -1,7 +1,7 @@
-from time import sleep
+from datetime import datetime
 import google.genai.types as types
 import os
-from datetime import datetime
+
 
 def get_files_info(working_directory, directory="."):
     files_info = []
@@ -31,7 +31,7 @@ def get_files_info(working_directory, directory="."):
                 "file_path": relative_path,
                 "last_modified": last_modified_datetime.strftime("%Y-%m-%d %H:%M:%S")
             })
-    sleep (1)
+
     return files_info
 
 schema_get_files_info = types.FunctionDeclaration(
@@ -49,7 +49,7 @@ schema_get_files_info = types.FunctionDeclaration(
                 description="Sub-directory path to list files from, relative to working_directory."
             ),
         },
-        required=["working_directory"] # Bắt buộc phải có cái này thì hàm mới chạy được
+        required=["working_directory"] # Required parameter
     ),
 )
 

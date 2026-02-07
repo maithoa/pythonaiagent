@@ -7,6 +7,7 @@ from google.genai import types
 from call_function import available_functions
 import argparse
 import functions.get_files_info as get_files_info_module
+import functions.get_file_content as get_file_content_module
 #Change to use Hugging Face API due to Google Gemini API Key rate limit issues
 #from huggingface_hub import InferenceClient as hfInferenceClient
 
@@ -19,26 +20,7 @@ def main():
 
     load_dotenv(find_dotenv(),override=True)
     gemini_api_key = os.getenv("GEMINI_API_KEY")
-    hugging_face_api_key = os.getenv("HUGGING_FACE_API_KEY")
-
-    #debug using HF API
-    #hf_client = hfInferenceClient(token=hugging_face_api_key)
-
-    #completion = hf_client.chat.completions.create(
-    #    model="Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    #    messages=[
-    #        {
-    #            "role": "user",
-    #            "content": "What is the capital of France?"
-    #        }
-    #    ],
-    #)
-
-
-
-     
-
-
+    
     if not gemini_api_key:
         print("GEMINI_API_KEY is not set in the environment.")
         sys.exit(1)
@@ -55,9 +37,37 @@ def main():
     
     generate_content(client, messages, args.verbose)
 
+def handle_function_call(call: types.FunctionCall):
+    #use Dispatch Table where function name maps to actual function
+    function_registry = {
+        "get_files_info": lambda args: get_files_info_module.get_files_info(
+            args.get("working_directory"), 
+            args.get("directory", ".")
+        ),
+        "get_file_content": lambda args: get_file_content_module.get_file_content(
+            args.get("file_name"), 
+            args.get("working_directory", ".")
+        ),
+    }
+
+    #execution
+    executor = function_registry.get(call.name)
+
+    if not executor:
+        return {"error": f"Function {call.name} not implemented."}
+    
+    try: 
+        return executor(call.args)
+    except Exception as e:
+        return {"error": f"Execution failed for '{call.name}': {str(e)}"}
+    
+
+   
+
 
 def generate_content(client, messages, verbose_flag):
     MODEL_ID = "gemini-2.0-flash"
+    MAX_FUNCTION_CALLS = 5
     try: 
         stacked_messages = messages
         # 1. Model think and decide which tool to call
@@ -79,21 +89,17 @@ def generate_content(client, messages, verbose_flag):
         # Check if there's a function call in the response
         tool_parts = []
         count_run = 0
+        print (response.candidates[0].content)
         for part in response.candidates[0].content.parts:
-            if part.function_call and count_run < 1:
-                call = part.function_call
-                print(f"Model is asking to use function: {call.name} with arguments {call.args}")
-    
-                # Execute the function call
-                if call.name == "get_files_info":
-                    function_result = get_files_info_module.get_files_info(call.args.get("working_directory"), call.args.get("directory", "."))
-                else: 
-                    function_result = {"error": f"Function {call.name} not implemented."}
+            if part.function_call and count_run < MAX_FUNCTION_CALLS:
+                
+                print(f"Model requested to call fun ction: {part.function_call.name} with args {part.function_call.args}")
+                function_ressult = handle_function_call(part.function_call)
                 
                 tool_parts.append(
                     types.Part.from_function_response(
-                        name=call.name,
-                        response={'result': function_result}
+                        name=part.function_call.name,
+                        response={'result': function_ressult}
                     )
                 )
                 count_run += 1
@@ -102,9 +108,9 @@ def generate_content(client, messages, verbose_flag):
             tool_content = types.Content(role = "tool", parts=tool_parts)
             stacked_messages.append(tool_content)
         
-        #print ("Stacked messages after tool call:", stacked_messages)
+        print ("Stacked messages after tool call:", stacked_messages)
 
-        # 5. GỬI KẾT QUẢ NGƯỢC LẠI CHO MODEL (Lần 2)
+        # 5. SEND CALL RESULT TO MODEL (2nd time)
         response_final = client.models.generate_content(
             model=MODEL_ID,
             contents=stacked_messages, # History of messages
