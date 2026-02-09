@@ -1,4 +1,5 @@
 import os
+from google.generativeai import types
 
 def write_file(working_directory: str, filename: str, content: str) -> None:
     """
@@ -39,3 +40,36 @@ def write_file(working_directory: str, filename: str, content: str) -> None:
     # Write to file (creates file if it doesn't exist)
     with open(file_path_abs, 'w', encoding='utf-8') as f:
         f.write(content)
+
+    print(f"File '{filename}' has been written successfully in '{working_directory}'.")
+
+schema_write_file = types.FunctionDeclaration(
+    name="write_file",
+    description="Writes content to a specified file within a working directory.",
+    parameters=types.Schema(
+        type="OBJECT",
+        properties={
+            "working_directory": types.Schema(
+                type="STRING",
+                description="The root path where the operation takes place (e.g., './project_alpha'). In case not provided, defaults to current directory."
+            ),
+            "file_name": types.Schema(
+                type="STRING",
+                description="The name of the file to read, relative to the working_directory. Eg. source.py"
+            ),
+            "content": types.Schema(
+                type="STRING",
+                description="The content to write to the specified file."
+            ),
+        },
+        required=["file_name", "working_directory", "content"] # Required parameters
+    ),
+)
+
+# Example usage:
+if __name__ == "__main__":
+    working_directory = "calculator"
+    filename = "example_output.txt"
+    content = "This is an example content written to the file."
+    write_file(working_directory, filename, content)
+
