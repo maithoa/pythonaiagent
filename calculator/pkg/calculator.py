@@ -18,6 +18,8 @@ class Calculator:
     def evaluate(self, expression):
         if not expression or expression.isspace():
             return None
+        # Insert spaces around parentheses to ensure they become separate tokens
+        expression = expression.replace("(", " ( ").replace(")", " ) ")
         tokens = expression.strip().split()
         return self._evaluate_infix(tokens)
 
@@ -30,32 +32,32 @@ class Calculator:
                 while (
                     operators
                     and operators[-1] in self.operators
-                    and self.precedence[operators[-1]] >= self.precedence[token]
+                    and self.precedence[token] <= self.precedence[operators[-1]]
                 ):
-                    self._apply_operator(operators, values)
+                    op = operators.pop()
+                    val2 = values.pop()
+                    val1 = values.pop()
+                    values.append(self.operators[op](val1, val2))
                 operators.append(token)
+            elif token == '(':
+                operators.append(token)
+            elif token == ')':
+                while operators and operators[-1] != '(':
+                    op = operators.pop()
+                    val2 = values.pop()
+                    val1 = values.pop()
+                    values.append(self.operators[op](val1, val2))
+                operators.pop()  # Remove '('
             else:
                 try:
                     values.append(float(token))
                 except ValueError:
-                    raise ValueError(f"invalid token: {token}")
+                    return "Invalid input: Non-numeric token"
 
         while operators:
-            self._apply_operator(operators, values)
+            op = operators.pop()
+            val2 = values.pop()
+            val1 = values.pop()
+            values.append(self.operators[op](val1, val2))
 
-        if len(values) != 1:
-            raise ValueError("invalid expression")
-
-        return values[0]
-
-    def _apply_operator(self, operators, values):
-        if not operators:
-            return
-
-        operator = operators.pop()
-        if len(values) < 2:
-            raise ValueError(f"not enough operands for operator {operator}")
-
-        b = values.pop()
-        a = values.pop()
-        values.append(self.operators[operator](a, b))
+        return values[0] if values else None

@@ -26,7 +26,13 @@ def main():
 
 
     
-    messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
+    #messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
+    messages = [
+            {
+                "role": "user",
+                "content": args.user_prompt
+            }
+        ]
 
     if args.verbose:
         print (f"Using prompt: {args.user_prompt}\n")
@@ -34,17 +40,26 @@ def main():
     generate_content(hf_client, messages, args.verbose)
 
 
+   
+
+
+
 def generate_content(client, messages, verbose_flag):
     try: 
         stacked_messages = list(messages) 
         # 1. Model think and decide which tool to call
-        response = client.models.generate_content(
+
+     
+        response = client.text_generation(
             model="Qwen/Qwen3-Coder-30B-A3B-Instruct",
-            contents=stacked_messages,
+            messages=stacked_messages,
+            
+
             config= types.GenerateContentConfig(
                 system_instruction=system_prompt, 
                 temperature= 0.1,
                 tools=[available_functions]),
+                
         )
 
         #stacked with response message

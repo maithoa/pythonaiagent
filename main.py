@@ -7,9 +7,9 @@ from google.genai import types
 from call_function import available_functions
 import argparse
 import functions.get_files_info as get_files_info_module
-#Change to use Hugging Face API due to Google Gemini API Key rate limit issues
-#from huggingface_hub import InferenceClient as hfInferenceClient
-
+import functions.get_file_content as get_file_content_module
+import functions.write_file as write_file_module
+import functions.run_python_file as run_python_file_module
 
 def main():
     parser = argparse.ArgumentParser(description="AI Code Assistant - Thoa's version")
@@ -19,26 +19,7 @@ def main():
 
     load_dotenv(find_dotenv(),override=True)
     gemini_api_key = os.getenv("GEMINI_API_KEY")
-    hugging_face_api_key = os.getenv("HUGGING_FACE_API_KEY")
-
-    #debug using HF API
-    #hf_client = hfInferenceClient(token=hugging_face_api_key)
-
-    #completion = hf_client.chat.completions.create(
-    #    model="Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    #    messages=[
-    #        {
-    #            "role": "user",
-    #            "content": "What is the capital of France?"
-    #        }
-    #    ],
-    #)
-
-
-
-     
-
-
+    
     if not gemini_api_key:
         print("GEMINI_API_KEY is not set in the environment.")
         sys.exit(1)
@@ -55,82 +36,107 @@ def main():
     
     generate_content(client, messages, args.verbose)
 
+def handle_function_call(call: types.FunctionCall):
+    #use Dispatch Table where function name maps to actual function
+    function_registry = {
+        "get_files_info": lambda args: get_files_info_module.get_files_info(
+            args.get("working_directory"), 
+            args.get("directory", ".")
+        ),
+        "get_file_content": lambda args: get_file_content_module.get_file_content(
+            args.get("file_name"), 
+            args.get("working_directory", ".")
+        ),
+        "write_file": lambda args: write_file_module.write_file(
+            args.get("working_directory"), 
+            args.get("file_name"),
+            args.get("content")
+        ),
+        "run_python_file": lambda args: run_python_file_module.run_python_file(
+            args.get("file_path"),
+            args.get("working_directory")
+        ),
+    }
+
+    #execution
+    executor = function_registry.get(call.name)
+
+    if not executor:
+        return {"error": f"Function {call.name} not implemented."}
+    
+    try: 
+        return executor(call.args)
+    except Exception as e:
+        return {"error": f"Execution failed for '{call.name}': {str(e)}"}
+    
 
 def generate_content(client, messages, verbose_flag):
     MODEL_ID = "gemini-2.0-flash"
-    try: 
-        stacked_messages = messages
-        # 1. Model think and decide which tool to call
-        response = client.models.generate_content(
-            model=MODEL_ID,
-            contents=stacked_messages,
-            config= types.GenerateContentConfig(
-                system_instruction=system_prompt, 
-                temperature= 0.1,
-                tools=[available_functions]),
-        )
-
-        if not response.candidates or not response.candidates[0].content:
-            print("No candidates returned")
-            return
-        #stacked with response message
-        stacked_messages.append(response.candidates[0].content)
-
-        # Check if there's a function call in the response
-        tool_parts = []
-        count_run = 0
-        for part in response.candidates[0].content.parts:
-            if part.function_call and count_run < 1:
-                call = part.function_call
-                print(f"Model is asking to use function: {call.name} with arguments {call.args}")
-    
-                # Execute the function call
-                if call.name == "get_files_info":
-                    function_result = get_files_info_module.get_files_info(call.args.get("working_directory"), call.args.get("directory", "."))
-                else: 
-                    function_result = {"error": f"Function {call.name} not implemented."}
-                
-                tool_parts.append(
-                    types.Part.from_function_response(
-                        name=call.name,
-                        response={'result': function_result}
-                    )
-                )
-                count_run += 1
-                    
-        if tool_parts : 
-            tool_content = types.Content(role = "tool", parts=tool_parts)
-            stacked_messages.append(tool_content)
-        
-        #print ("Stacked messages after tool call:", stacked_messages)
-
-        # 5. GỬI KẾT QUẢ NGƯỢC LẠI CHO MODEL (Lần 2)
-        response_final = client.models.generate_content(
-            model=MODEL_ID,
-            contents=stacked_messages, # History of messages
-            config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    tools=[available_functions],
-                    temperature=0.1,
-                ),
+    MAX_FUNCTION_CALLS = 5
+    stacked_messages = messages.copy()
+    loop_counter = 0
+    for iteration in range(MAX_FUNCTION_CALLS):
+        loop_counter = iteration + 1
+        try: 
+            
+            # 1. Model think and decide which tool to call
+            response = client.models.generate_content(
+                model=MODEL_ID,
+                contents=stacked_messages,
+                config= types.GenerateContentConfig(
+                    system_instruction=system_prompt, 
+                    temperature= 0.1,
+                    tools=[available_functions]),
             )
-        if not response_final or not response_final.candidates or not response_final.candidates[0].content:
-            print("No final candidates returned")
-            return
-        
-        # Cuối cùng, khi không còn function_call nào, Model sẽ trả về text
-        print("\n=====================Final Result================:")
-        print(response_final.text)
-        #print(response_final)
+            #print (response)
 
-        if verbose_flag:
-            print(f"User prompt: {messages[0].parts[0].text}")
-            print(f"Prompt tokens: {response_final.usage_metadata.prompt_token_count}")
-            print(f"Response tokens: {response_final.usage_metadata.candidates_token_count}")
-            print(f"Total tokens: {response_final.usage_metadata.total_token_count}")
+            if not response.candidates or len(response.candidates) == 0:
+                print("No candidates returned")
+                break
+            else: 
+                # 2. Loop through candidates to append the content to stacked messages
+                for candidate in response.candidates:
+                    if candidate.content is None: 
+                        continue
+                    else: 
+                        stacked_messages.append(candidate.content)
+            
+            # 3. Loop through function calls and execute them
+            tool_parts = []
+            count_run = 0
+            if response.function_calls:
+                for requestedFunc in response.function_calls:
+                    if requestedFunc.name and count_run < MAX_FUNCTION_CALLS:
+                        
+                        print(f"Model requested to call function: {requestedFunc.name} with args {requestedFunc.args}")
+                        function_ressult = handle_function_call(requestedFunc)
+                        
+                        tool_parts.append(
+                            types.Part.from_function_response(
+                                name=requestedFunc.name,
+                                response={'result': function_ressult}
+                            )
+                        )
+                        count_run += 1
+                            
+                if tool_parts : 
+                    tool_content = types.Content(role = "tool", parts=tool_parts)
+                    stacked_messages.append(tool_content)
+                
+                #print ("Stacked messages after tool call:", stacked_messages)
+            else: 
+                #final response without function call
+                print (f"Final Response: {response.text}")
+                print (f"I have looped through {loop_counter} times.")
+                break
     
-    except Exception as e:
-        print(f"[!] Error occurred: {e}")
+        except Exception as e:
+            print(f"[!] Error occurred: {e}")
+            break
+        
+
+    
+    
 
 
 if __name__ == "__main__":
