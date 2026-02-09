@@ -32,46 +32,32 @@ class Calculator:
                 while (
                     operators
                     and operators[-1] in self.operators
-                    and self.precedence[operators[-1]] >= self.precedence[token]
+                    and self.precedence[token] <= self.precedence[operators[-1]]
                 ):
-                    self._apply_operator(operators, values)
+                    op = operators.pop()
+                    val2 = values.pop()
+                    val1 = values.pop()
+                    values.append(self.operators[op](val1, val2))
                 operators.append(token)
-            elif token.isdigit() or (token.startswith("-") and token[1:].isdigit()):
-                values.append(float(token))
-            elif token == "(":
+            elif token == '(':
                 operators.append(token)
-            elif token == ")":
-                while operators and operators[-1] != "(":
-                    self._apply_operator(operators, values)
-                operators.pop()  # Remove the '('
+            elif token == ')':
+                while operators and operators[-1] != '(':
+                    op = operators.pop()
+                    val2 = values.pop()
+                    val1 = values.pop()
+                    values.append(self.operators[op](val1, val2))
+                operators.pop()  # Remove '('
             else:
-                raise ValueError(f"Invalid token: {token}")
+                try:
+                    values.append(float(token))
+                except ValueError:
+                    return "Invalid input: Non-numeric token"
 
         while operators:
-            self._apply_operator(operators, values)
+            op = operators.pop()
+            val2 = values.pop()
+            val1 = values.pop()
+            values.append(self.operators[op](val1, val2))
 
-        return values[0]
-
-    def _apply_operator(self, operators, values):
-        operator = operators.pop()
-        
-        # Validate operator exists
-        if operator not in self.operators:
-            raise ValueError(f"Invalid operator: {operator}")
-        
-        # Validate sufficient operands
-        if len(values) < 2:
-            raise ValueError(f"Not enough operands for operator '{operator}'")
-        
-        right = values.pop()
-        left = values.pop()
-        operation = self.operators[operator]
-        result = operation(left, right)
-        values.append(result)
-
-
-if __name__ == "__main__":
-    calculator = Calculator()
-    expression = "3 + 7 * 2"
-    result = calculator.evaluate(expression)
-    print(f"{expression} = {result}")
+        return values[0] if values else None
