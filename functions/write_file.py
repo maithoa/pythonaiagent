@@ -11,10 +11,30 @@ def write_file(working_directory: str, filename: str, content: str) -> None:
         working_directory: Directory where the file is located
         filename: name of file to write, assumed to be relative to working_directory
         content: Content to write to the file
+    
+    Raises:
+        ValueError: If the resolved file path is outside the working directory
     """
 
+    # Resolve absolute paths
+    working_dir_abs = os.path.abspath(working_directory)
     file_path_abs = os.path.abspath(os.path.join(working_directory, filename))
-    working_dir_abs = os.path.abspath(os.path.dirname(file_path_abs))
+    
+    # Validate that file_path_abs is within working_dir_abs to prevent path traversal
+    try:
+        common_path = os.path.commonpath([working_dir_abs, file_path_abs])
+        if common_path != working_dir_abs:
+            raise ValueError(
+                f"Security error: File path '{filename}' resolves outside the working directory. "
+                f"Resolved path: '{file_path_abs}', Working directory: '{working_dir_abs}'"
+            )
+    except ValueError as e:
+        # os.path.commonpath raises ValueError if paths are on different drives (Windows)
+        raise ValueError(
+            f"Security error: File path '{filename}' is not valid within the working directory."
+        ) from e
+    
+    
     # Try to read existing file content to warn before overwriting
     try:
         with open(file_path_abs, 'r', encoding='utf-8') as f:
@@ -29,14 +49,14 @@ def write_file(working_directory: str, filename: str, content: str) -> None:
         print(f"--- End of Content ---")
         print("This will overwrite the previous content.")
 
-
-    # Create directory if it doesn't exist and directory path is not empty
-    try:
-        os.makedirs(working_dir_abs, exist_ok=True)
-    except OSError as e:
-        print(f"Error: Failed to create directory '{working_dir_abs}': {e}")
-        raise
-    os.makedirs(working_dir_abs, exist_ok=True)
+    # Create directory if it doesn't exist
+    file_dir = os.path.dirname(file_path_abs)
+    if file_dir:
+        try:
+            os.makedirs(file_dir, exist_ok=True)
+        except OSError as e:
+            print(f"Error: Failed to create directory '{file_dir}': {e}")
+            raise
     # Write to file (creates file if it doesn't exist)
     with open(file_path_abs, 'w', encoding='utf-8') as f:
         f.write(content)
