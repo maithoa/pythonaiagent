@@ -17,7 +17,7 @@ def run_python_file(file_path, working_directory):
         valid_target_file = False
     
     if not valid_target_file:
-        print(f"Error: The target file {abs_file_path} is outside the working directory {working_directory}. Access denied.")
+        print(f"Error: The target file {abs_file_path} is outside the working directory {working_dir_abs}. Access denied.")
         return
 
     if not os.path.isfile(abs_file_path):
