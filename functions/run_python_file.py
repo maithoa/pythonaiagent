@@ -10,7 +10,13 @@ def run_python_file(file_path, working_directory):
     working_dir_abs = os.path.abspath(working_directory)
 
     # Validate that the target file is within the working directory
-    if not abs_file_path.startswith(working_dir_abs):
+    try:
+        valid_target_file = os.path.commonpath([working_dir_abs, abs_file_path]) == working_dir_abs
+    except ValueError:
+        # Different drives on Windows
+        valid_target_file = False
+    
+    if not valid_target_file:
         print(f"Error: The target file {abs_file_path} is outside the working directory {working_directory}. Access denied.")
         return
 
