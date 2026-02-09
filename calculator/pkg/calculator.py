@@ -18,6 +18,8 @@ class Calculator:
     def evaluate(self, expression):
         if not expression or expression.isspace():
             return None
+        # Insert spaces around parentheses to ensure they become separate tokens
+        expression = expression.replace("(", " ( ").replace(")", " ) ")
         tokens = expression.strip().split()
         return self._evaluate_infix(tokens)
 
