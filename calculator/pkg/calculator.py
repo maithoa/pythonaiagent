@@ -52,6 +52,15 @@ class Calculator:
 
     def _apply_operator(self, operators, values):
         operator = operators.pop()
+        
+        # Validate operator exists
+        if operator not in self.operators:
+            raise ValueError(f"Invalid operator: {operator}")
+        
+        # Validate sufficient operands
+        if len(values) < 2:
+            raise ValueError(f"Not enough operands for operator '{operator}'")
+        
         right = values.pop()
         left = values.pop()
         operation = self.operators[operator]
