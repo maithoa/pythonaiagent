@@ -34,28 +34,33 @@ class Calculator:
                 ):
                     self._apply_operator(operators, values)
                 operators.append(token)
+            elif token.isdigit() or (token.startswith("-") and token[1:].isdigit()):
+                values.append(float(token))
+            elif token == "(":
+                operators.append(token)
+            elif token == ")":
+                while operators and operators[-1] != "(":
+                    self._apply_operator(operators, values)
+                operators.pop()  # Remove the '('
             else:
-                try:
-                    values.append(float(token))
-                except ValueError:
-                    raise ValueError(f"invalid token: {token}")
+                raise ValueError(f"Invalid token: {token}")
 
         while operators:
             self._apply_operator(operators, values)
 
-        if len(values) != 1:
-            raise ValueError("invalid expression")
-
         return values[0]
 
     def _apply_operator(self, operators, values):
-        if not operators:
-            return
-
         operator = operators.pop()
-        if len(values) < 2:
-            raise ValueError(f"not enough operands for operator {operator}")
+        right = values.pop()
+        left = values.pop()
+        operation = self.operators[operator]
+        result = operation(left, right)
+        values.append(result)
 
-        b = values.pop()
-        a = values.pop()
-        values.append(self.operators[operator](a, b))
+
+if __name__ == "__main__":
+    calculator = Calculator()
+    expression = "3 + 7 * 2"
+    result = calculator.evaluate(expression)
+    print(f"{expression} = {result}")

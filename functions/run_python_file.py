@@ -29,3 +29,23 @@ def run_python_file(file_path):
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while running the file {abs_file_path}:")
         print(e.stderr)
+
+schema_run_python_file = {
+    "name": "run_python_file",
+    "description": "Executes a specified Python file and returns its output or errors.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "The path to the Python file to execute."
+            },
+        },
+        "required": ["file_path"]
+    },
+}
+
+# Example usage:
+if __name__ == "__main__":
+    test_file_path = "calculator/main.py"
+    run_python_file(test_file_path)

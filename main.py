@@ -8,9 +8,8 @@ from call_function import available_functions
 import argparse
 import functions.get_files_info as get_files_info_module
 import functions.get_file_content as get_file_content_module
-#Change to use Hugging Face API due to Google Gemini API Key rate limit issues
-#from huggingface_hub import InferenceClient as hfInferenceClient
-
+import functions.write_file as write_file_module
+import functions.run_python_file as run_python_file_module
 
 def main():
     parser = argparse.ArgumentParser(description="AI Code Assistant - Thoa's version")
@@ -48,6 +47,14 @@ def handle_function_call(call: types.FunctionCall):
             args.get("file_name"), 
             args.get("working_directory", ".")
         ),
+        "write_file": lambda args: write_file_module.write_file(
+            args.get("working_directory"), 
+            args.get("file_name"),
+            args.get("content")
+        ),
+        "run_python_file": lambda args: run_python_file_module.run_python_file(
+            args.get("file_path")
+        ),
     }
 
     #execution
@@ -62,81 +69,73 @@ def handle_function_call(call: types.FunctionCall):
         return {"error": f"Execution failed for '{call.name}': {str(e)}"}
     
 
-   
-
-
 def generate_content(client, messages, verbose_flag):
     MODEL_ID = "gemini-2.0-flash"
     MAX_FUNCTION_CALLS = 5
-    try: 
-        stacked_messages = messages
-        # 1. Model think and decide which tool to call
-        response = client.models.generate_content(
-            model=MODEL_ID,
-            contents=stacked_messages,
-            config= types.GenerateContentConfig(
-                system_instruction=system_prompt, 
-                temperature= 0.1,
-                tools=[available_functions]),
-        )
-
-        if not response.candidates or not response.candidates[0].content:
-            print("No candidates returned")
-            return
-        #stacked with response message
-        stacked_messages.append(response.candidates[0].content)
-
-        # Check if there's a function call in the response
-        tool_parts = []
-        count_run = 0
-        print (response.candidates[0].content)
-        for part in response.candidates[0].content.parts:
-            if part.function_call and count_run < MAX_FUNCTION_CALLS:
-                
-                print(f"Model requested to call fun ction: {part.function_call.name} with args {part.function_call.args}")
-                function_ressult = handle_function_call(part.function_call)
-                
-                tool_parts.append(
-                    types.Part.from_function_response(
-                        name=part.function_call.name,
-                        response={'result': function_ressult}
-                    )
-                )
-                count_run += 1
-                    
-        if tool_parts : 
-            tool_content = types.Content(role = "tool", parts=tool_parts)
-            stacked_messages.append(tool_content)
-        
-        print ("Stacked messages after tool call:", stacked_messages)
-
-        # 5. SEND CALL RESULT TO MODEL (2nd time)
-        response_final = client.models.generate_content(
-            model=MODEL_ID,
-            contents=stacked_messages, # History of messages
-            config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    tools=[available_functions],
-                    temperature=0.1,
-                ),
+    stacked_messages = messages.copy()
+    loop_counter = 0
+    for iter in range (MAX_FUNCTION_CALLS):
+        loop_counter = iter + 1
+        try: 
+            
+            # 1. Model think and decide which tool to call
+            response = client.models.generate_content(
+                model=MODEL_ID,
+                contents=stacked_messages,
+                config= types.GenerateContentConfig(
+                    system_instruction=system_prompt, 
+                    temperature= 0.1,
+                    tools=[available_functions]),
             )
-        if not response_final or not response_final.candidates or not response_final.candidates[0].content:
-            print("No final candidates returned")
-            return
-        
-        # Cuối cùng, khi không còn function_call nào, Model sẽ trả về text
-        print("\n=====================Final Result================:")
-        print(response_final.text)
-        #print(response_final)
+            #print (response)
 
-        if verbose_flag:
-            print(f"User prompt: {messages[0].parts[0].text}")
-            print(f"Prompt tokens: {response_final.usage_metadata.prompt_token_count}")
-            print(f"Response tokens: {response_final.usage_metadata.candidates_token_count}")
-            print(f"Total tokens: {response_final.usage_metadata.total_token_count}")
+            if not response.candidates or len(response.candidates) == 0:
+                print("No candidates returned")
+                break
+            else: 
+                # 2. Loop through candidates to append the content to stacked messages
+                for candidate in response.candidates:
+                    if candidate.content is None: 
+                        continue
+                    else: 
+                        stacked_messages.append(candidate.content)
+            
+            # 3. Loop through function calls and execute them
+            tool_parts = []
+            count_run = 0
+            if response.function_calls:
+                for requestedFunc in response.function_calls:
+                    if requestedFunc.name and count_run < MAX_FUNCTION_CALLS:
+                        
+                        print(f"Model requested to call function: {requestedFunc.name} with args {requestedFunc.args}")
+                        function_ressult = handle_function_call(requestedFunc)
+                        
+                        tool_parts.append(
+                            types.Part.from_function_response(
+                                name=requestedFunc.name,
+                                response={'result': function_ressult}
+                            )
+                        )
+                        count_run += 1
+                            
+                if tool_parts : 
+                    tool_content = types.Content(role = "tool", parts=tool_parts)
+                    stacked_messages.append(tool_content)
+                
+                #print ("Stacked messages after tool call:", stacked_messages)
+            else: 
+                #final response without function call
+                print (f"Final Response: {response.text}")
+                print (f"I have looped through {loop_counter} times.")
+                break
     
-    except Exception as e:
-        print(f"[!] Error occurred: {e}")
+        except Exception as e:
+            print(f"[!] Error occurred: {e}")
+            break
+        
+
+    
+    
 
 
 if __name__ == "__main__":

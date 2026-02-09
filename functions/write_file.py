@@ -1,5 +1,5 @@
 import os
-from google.generativeai import types
+import google.genai.types as types
 
 def write_file(working_directory: str, filename: str, content: str) -> None:
     """
@@ -45,7 +45,7 @@ def write_file(working_directory: str, filename: str, content: str) -> None:
 
 schema_write_file = types.FunctionDeclaration(
     name="write_file",
-    description="Writes content to a specified file within a working directory.",
+    description="Writes a content to a specified file within a working directory.",
     parameters=types.Schema(
         type="OBJECT",
         properties={
@@ -55,7 +55,7 @@ schema_write_file = types.FunctionDeclaration(
             ),
             "file_name": types.Schema(
                 type="STRING",
-                description="The name of the file to read, relative to the working_directory. Eg. source.py"
+                description="The name of the file to write, relative to the working_directory. Eg. source.py"
             ),
             "content": types.Schema(
                 type="STRING",
