@@ -34,7 +34,6 @@ def write_file(working_directory: str, filename: str, content: str) -> None:
             f"Security error: File path '{filename}' is not valid within the working directory."
         ) from e
     
-    
     # Try to read existing file content to warn before overwriting
     try:
         with open(file_path_abs, 'r', encoding='utf-8') as f:
