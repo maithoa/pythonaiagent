@@ -1,15 +1,23 @@
 #Code to run a python file
-def run_python_file(file_path):
+def run_python_file(file_path, working_directory):
     import subprocess
     import sys
     import os
 
-    abs_file_path = os.path.abspath(file_path)
+    # Construct the target file path relative to working directory
+    target_file = os.path.normpath(os.path.join(working_directory, file_path))
+    abs_file_path = os.path.abspath(target_file)
+    working_dir_abs = os.path.abspath(working_directory)
+
+    # Validate that the target file is within the working directory
+    if not abs_file_path.startswith(working_dir_abs):
+        print(f"Error: The target file {abs_file_path} is outside the working directory {working_directory}. Access denied.")
+        return
 
     if not os.path.isfile(abs_file_path):
         print(f"Error: The file {abs_file_path} does not exist.")
         return
-    if not file_path.endswith('.py'):
+    if not abs_file_path.endswith('.py'):
         print(f"Error: The file {abs_file_path} is not a Python file.")
         return
 
@@ -32,20 +40,25 @@ def run_python_file(file_path):
 
 schema_run_python_file = {
     "name": "run_python_file",
-    "description": "Executes a specified Python file and returns its output or errors.",
+    "description": "Executes a specified Python file within a working directory and returns its output or errors.",
     "parameters": {
         "type": "object",
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "The path to the Python file to execute."
+                "description": "The path to the Python file to execute, relative to the working_directory."
+            },
+            "working_directory": {
+                "type": "string",
+                "description": "The root path where the operation takes place (e.g., './project_alpha')."
             },
         },
-        "required": ["file_path"]
+        "required": ["file_path", "working_directory"]
     },
 }
 
 # Example usage:
 if __name__ == "__main__":
-    test_file_path = "calculator/main.py"
-    run_python_file(test_file_path)
+    working_directory = "calculator"
+    test_file_path = "main.py"
+    run_python_file(test_file_path, working_directory)

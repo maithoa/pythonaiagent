@@ -53,7 +53,8 @@ def handle_function_call(call: types.FunctionCall):
             args.get("content")
         ),
         "run_python_file": lambda args: run_python_file_module.run_python_file(
-            args.get("file_path")
+            args.get("file_path"),
+            args.get("working_directory")
         ),
     }
 

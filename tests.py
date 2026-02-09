@@ -28,8 +28,8 @@ def main():
     write_file(working_directory, "subdir/test_output2.txt", "This content will overwrite the previous content in subdirectory.")
 
     #test run python file
-    run_python_file(os.path.join(working_directory, "test_output.txt"))
-    run_python_file(os.path.join(working_directory, "main.py"))
+    run_python_file("test_output.txt", working_directory)
+    run_python_file("main.py", working_directory)
 
     
 
