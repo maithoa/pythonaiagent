@@ -74,8 +74,8 @@ def generate_content(client, messages, verbose_flag):
     MAX_FUNCTION_CALLS = 5
     stacked_messages = messages.copy()
     loop_counter = 0
-    for iter in range (MAX_FUNCTION_CALLS):
-        loop_counter = iter + 1
+    for iteration in range(MAX_FUNCTION_CALLS):
+        loop_counter = iteration + 1
         try: 
             
             # 1. Model think and decide which tool to call
